@@ -40,7 +40,7 @@ def scan_directory(directory):
                 file_path = os.path.join(root, file)
                 with open(file_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
-                    in_comment_block = False  # Track multi-line comments
+                    in_comment_block = False  # Track multi-line comments and docstrings
                     for line_num, line in enumerate(lines, 1):
                         # Skip lines that define regex patterns (e.g., r'API_?KEY')
                         if re.search(r'^\s*r[\'"]', line):
@@ -58,7 +58,7 @@ def scan_directory(directory):
                                 in_comment_block = False
                             continue
                         
-                        # Skip docstrings in Python
+                        # Skip docstrings and multi-line strings in Python
                         if re.search(r'^\s*[\'\"]{3}', line):  # Start or end of docstring
                             in_comment_block = not in_comment_block
                             continue
@@ -73,4 +73,5 @@ def scan_directory(directory):
                                     'line': line_num,
                                     'line_content': line.strip()
                                 })
+                                break  # Stop checking other patterns if a match is found
     return issues
