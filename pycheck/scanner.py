@@ -60,10 +60,22 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
         '.env', '.json', '.yaml', '.yml', '.ini', '.cfg', '.xml', '.toml', '.properties'  # Config files
     )
 
+    # Files to exclude (e.g., minified JavaScript files)
+    exclude_files = [
+        r'\.min\.js$',  # Minified JavaScript files
+        r'\.min\.css$',  # Minified CSS files
+    ]
+
     for root, _, files in os.walk(directory):
         for file in files:
+            file_path = os.path.join(root, file)
+
+            # Skip minified files
+            if any(re.search(pattern, file) for pattern in exclude_files):
+                logging.info(f"Skipping minified file: {file_path}")
+                continue
+
             if file.endswith(supported_extensions):
-                file_path = os.path.join(root, file)
                 try:
                     # Try reading the file with UTF-8 encoding first
                     with open(file_path, 'r', encoding='utf-8') as f:
