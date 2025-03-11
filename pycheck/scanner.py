@@ -100,9 +100,6 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
                                 'line_content': line.strip()
                             })
                             break  # Stop checking other patterns if a match is found
-                except (IOError, PermissionError) as e:
-                    logging.error(f"Error reading file {file_path}: {e}")
-                    continue
 
     return issues
 
