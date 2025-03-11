@@ -1,10 +1,8 @@
 import os
 import re
 
-
 def scan_directory(directory):
     issues = []
-    # Expanded list of patterns to detect
     key_patterns = [
         r'API_?KEY', r'SECRET_?KEY', r'ACCESS_?KEY', r'TOKEN',
         r'PASSWORD', r'CREDENTIALS', r'AUTH_?KEY', r'PRIVATE_?KEY',
@@ -13,10 +11,9 @@ def scan_directory(directory):
         r'AWS_?ACCESS_?KEY', r'AWS_?SECRET_?KEY', r'SSH_?KEY',
         r'PRIVATE_?KEY', r'PUBLIC_?KEY', r'ENCRYPTION_?KEY'
     ]
-
+    
     for root, _, files in os.walk(directory):
         for file in files:
-            # Scan files with common extensions
             if file.endswith(('.py', '.env', '.json', '.yaml', '.yml', '.txt', '.ini', '.cfg')):
                 file_path = os.path.join(root, file)
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -27,7 +24,6 @@ def scan_directory(directory):
                                 issues.append({
                                     'file': file_path,
                                     'line': line_num,
-                                    'line_content': line.strip(),
-                                    'pattern': pattern
+                                    'line_content': line.strip()
                                 })
     return issues
