@@ -40,10 +40,32 @@ def scan_directory(directory):
                 file_path = os.path.join(root, file)
                 with open(file_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
+                    in_comment_block = False  # Track multi-line comments
                     for line_num, line in enumerate(lines, 1):
                         # Skip lines that define regex patterns (e.g., r'API_?KEY')
                         if re.search(r'^\s*r[\'"]', line):
                             continue
+                        
+                        # Skip comment lines in Python, JavaScript, etc.
+                        if re.search(r'^\s*#', line):  # Python, shell, etc.
+                            continue
+                        if re.search(r'^\s*//', line):  # JavaScript, Java, C++, etc.
+                            continue
+                        if re.search(r'^\s*/\*', line):  # Start of multi-line comment in JS, Java, etc.
+                            in_comment_block = True
+                        if in_comment_block:
+                            if re.search(r'\*/', line):  # End of multi-line comment
+                                in_comment_block = False
+                            continue
+                        
+                        # Skip docstrings in Python
+                        if re.search(r'^\s*[\'\"]{3}', line):  # Start or end of docstring
+                            in_comment_block = not in_comment_block
+                            continue
+                        if in_comment_block:
+                            continue
+                        
+                        # Check for sensitive data
                         for pattern in sensitive_patterns:
                             if re.search(pattern, line, re.IGNORECASE):
                                 issues.append({
