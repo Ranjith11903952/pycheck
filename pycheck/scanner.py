@@ -52,6 +52,10 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
         r'^\s*[\'\"]{3}',  # Python docstrings
         r'@[\w\d_]+',  # JavaScript doc tags (e.g., @param, @return)
         r'\b(?:TODO|FIXME|XXX|HACK)\b',  # Common code annotations
+        r'ace\.define',  # Exclude ACE editor patterns
+        r'regex:"',  # Exclude regex patterns in JavaScript
+        r'showUsername\s*:',  # Exclude non-sensitive patterns like showUsername
+        r'userpic__username\s*:',  # Exclude non-sensitive patterns like userpic__username
     ]
 
     # Supported file extensions
@@ -70,9 +74,8 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
         for file in files:
             file_path = os.path.join(root, file)
 
-            # Skip minified files
+            # Skip minified files without logging
             if any(re.search(pattern, file) for pattern in exclude_files):
-                logging.info(f"Skipping minified file: {file_path}")
                 continue
 
             if file.endswith(supported_extensions):
