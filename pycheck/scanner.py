@@ -6,12 +6,13 @@ from typing import List, Dict, Any
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def scan_directory(directory: str) -> List[Dict[str, Any]]:
+def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
     """
     Scans a directory for files containing sensitive data patterns.
 
     Args:
         directory (str): The directory to scan.
+        verbose (bool): If True, print detailed logs for skipped files.
 
     Returns:
         List[Dict[str, Any]]: A list of issues found, each represented as a dictionary.
@@ -54,8 +55,8 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
         r'\b(?:TODO|FIXME|XXX|HACK)\b',  # Common code annotations
         r'ace\.define',  # Exclude ACE editor patterns
         r'regex:"',  # Exclude regex patterns in JavaScript
-        r'showUsername\s*:',  # Exclude non-sensitive patterns like showUsername
-        r'userpic__username\s*:',  # Exclude non-sensitive patterns like userpic__username
+        r'showUsername\s*:',  # Exclude showUsername in JavaScript
+        r'userpic__username\s*:',  # Exclude userpic__username in JavaScript
     ]
 
     # Supported file extensions
@@ -74,11 +75,14 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
         for file in files:
             file_path = os.path.join(root, file)
 
-            # Skip minified files without logging
+            # Skip minified files
             if any(re.search(pattern, file) for pattern in exclude_files):
+                if verbose:
+                    logging.info(f"Skipping minified file: {file_path}")
                 continue
 
             if file.endswith(supported_extensions):
+                logging.info(f"Scanning file: {file_path}")
                 try:
                     # Try reading the file with UTF-8 encoding first
                     with open(file_path, 'r', encoding='utf-8') as f:
@@ -144,7 +148,8 @@ def save_results_to_file(issues: List[Dict[str, Any]], output_file: str = "scan_
 if __name__ == "__main__":
     # Example usage
     directory_to_scan = "path/to/your/directory"
-    issues_found = scan_directory(directory_to_scan)
+    verbose = False  # Set to True to print detailed logs for skipped files
+    issues_found = scan_directory(directory_to_scan, verbose)
 
     if issues_found:
         logging.warning(f"Found {len(issues_found)} potential issues.")
