@@ -1,22 +1,19 @@
 import argparse
-from pycheck.pycheck.scanner import scan_directory
+from pycheck.scanner import scan_directory
 from pycheck.utils import highlight_issues
 
-
 def main():
-    parser = argparse.ArgumentParser(
-        description="Scan a directory for API keys, credentials, and other security issues.")
+    parser = argparse.ArgumentParser(description="Scan a directory for API keys, credentials, and other security issues.")
     parser.add_argument("directory", type=str, help="The directory to scan.")
-
+    
     args = parser.parse_args()
     issues = scan_directory(args.directory)
-
+    
     if issues:
         highlight_issues(issues)
         print(f"Found {len(issues)} potential security issues.")
     else:
         print("No security issues found.")
-
 
 if __name__ == "__main__":
     main()
