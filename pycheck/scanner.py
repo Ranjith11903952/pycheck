@@ -54,42 +54,52 @@ def scan_directory(directory: str) -> List[Dict[str, Any]]:
             if file.endswith(supported_extensions):
                 file_path = os.path.join(root, file)
                 try:
+                    # Try reading the file with UTF-8 encoding first
                     with open(file_path, 'r', encoding='utf-8') as f:
                         lines = f.readlines()
-                        in_comment_block = False  # Track multi-line comments and docstrings
-                        for line_num, line in enumerate(lines, 1):
-                            # Skip lines that define regex patterns (e.g., r'API_?KEY')
-                            if re.search(r'^\s*r[\'"]', line):
-                                continue
+                except UnicodeDecodeError:
+                    # If UTF-8 fails, try reading the file as binary
+                    try:
+                        with open(file_path, 'rb') as f:
+                            lines = [line.decode('latin-1') for line in f.readlines()]
+                    except Exception as e:
+                        logging.error(f"Error reading file {file_path}: {e}")
+                        continue
 
-                            # Skip comment lines in Python, JavaScript, etc.
-                            if re.search(r'^\s*#', line):  # Python, shell, etc.
-                                continue
-                            if re.search(r'^\s*//', line):  # JavaScript, Java, C++, etc.
-                                continue
-                            if re.search(r'^\s*/\*', line):  # Start of multi-line comment in JS, Java, etc.
-                                in_comment_block = True
-                            if in_comment_block:
-                                if re.search(r'\*/', line):  # End of multi-line comment
-                                    in_comment_block = False
-                                continue
+                in_comment_block = False  # Track multi-line comments and docstrings
+                for line_num, line in enumerate(lines, 1):
+                    # Skip lines that define regex patterns (e.g., r'API_?KEY')
+                    if re.search(r'^\s*r[\'"]', line):
+                        continue
 
-                            # Skip docstrings and multi-line strings in Python
-                            if re.search(r'^\s*[\'\"]{3}', line):  # Start or end of docstring
-                                in_comment_block = not in_comment_block
-                                continue
-                            if in_comment_block:
-                                continue
+                    # Skip comment lines in Python, JavaScript, etc.
+                    if re.search(r'^\s*#', line):  # Python, shell, etc.
+                        continue
+                    if re.search(r'^\s*//', line):  # JavaScript, Java, C++, etc.
+                        continue
+                    if re.search(r'^\s*/\*', line):  # Start of multi-line comment in JS, Java, etc.
+                        in_comment_block = True
+                    if in_comment_block:
+                        if re.search(r'\*/', line):  # End of multi-line comment
+                            in_comment_block = False
+                        continue
 
-                            # Check for sensitive data
-                            for pattern in sensitive_patterns:
-                                if re.search(pattern, line, re.IGNORECASE):
-                                    issues.append({
-                                        'file': file_path,
-                                        'line': line_num,
-                                        'line_content': line.strip()
-                                    })
-                                    break  # Stop checking other patterns if a match is found
+                    # Skip docstrings and multi-line strings in Python
+                    if re.search(r'^\s*[\'\"]{3}', line):  # Start or end of docstring
+                        in_comment_block = not in_comment_block
+                        continue
+                    if in_comment_block:
+                        continue
+
+                    # Check for sensitive data
+                    for pattern in sensitive_patterns:
+                        if re.search(pattern, line, re.IGNORECASE):
+                            issues.append({
+                                'file': file_path,
+                                'line': line_num,
+                                'line_content': line.strip()
+                            })
+                            break  # Stop checking other patterns if a match is found
                 except (IOError, PermissionError) as e:
                     logging.error(f"Error reading file {file_path}: {e}")
                     continue
