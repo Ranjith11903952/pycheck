@@ -41,6 +41,9 @@ def scan_directory(directory):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
                     for line_num, line in enumerate(lines, 1):
+                        # Skip lines that define regex patterns (e.g., r'API_?KEY')
+                        if re.search(r'^\s*r[\'"]', line):
+                            continue
                         for pattern in sensitive_patterns:
                             if re.search(pattern, line, re.IGNORECASE):
                                 issues.append({
