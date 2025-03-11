@@ -9,11 +9,7 @@ def main():
     args = parser.parse_args()
     issues = scan_directory(args.directory)
     
-    if issues:
-        highlight_issues(issues)
-        print(f"Found {len(issues)} potential security issues.")
-    else:
-        print("No security issues found.")
+    highlight_issues(issues)
 
 if __name__ == "__main__":
     main()
