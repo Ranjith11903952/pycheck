@@ -1,44 +1,94 @@
 import os
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 from colorama import Fore, Style, init
 
 # Initialize colorama
 init(autoreset=True)
 
-def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
+def load_ignore_patterns(directory: str) -> List[str]:
+    """Load patterns to ignore from .pycheckignore file"""
+    ignore_file = os.path.join(directory, '.pycheckignore')
+    if os.path.exists(ignore_file):
+        with open(ignore_file, 'r') as f:
+            return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    return []
+
+def should_skip_line(line: str, ignore_patterns: List[str]) -> bool:
+    """Check if line should be skipped from secret detection"""
+    trimmed = line.strip()
+    
+    # Skip empty lines
+    if not trimmed:
+        return True
+        
+    # Skip fully commented lines
+    if trimmed.startswith(('#', '//', '/*', '*/', '<!--', '-->')):
+        return True
+        
+    # Skip common documentation patterns
+    if any(trimmed.startswith(p) for p in ('@', '::', '..', '*', '"""', "'''")):
+        return True
+        
+    # Skip whitelisted patterns
+    if any(re.search(pattern, trimmed, re.IGNORECASE) for pattern in ignore_patterns):
+        return True
+        
+    return False
+
+def scan_directory(
+    directory: str,
+    verbose: bool = False,
+    auto_fix: bool = False,
+    clean_commented: bool = False,
+    extensions: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
     """
-    Scans directory for sensitive data with improved output formatting
+    Scans directory for sensitive data with improved detection
     
     Args:
         directory: Path to directory to scan
         verbose: Show detailed progress
-    
+        auto_fix: Automatically comment found issues
+        clean_commented: Remove commented-out secrets
+        extensions: Only scan files with these extensions
+        
     Returns:
         List of found issues with file, line, and content
     """
     issues = []
+    modified_files = set()
+    ignore_patterns = load_ignore_patterns(directory)
     
     # Secret patterns to detect
-    sensitive_patterns = [
-        r'API_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'SECRET_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'ACCESS_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'TOKEN\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'PASSWORD\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'CREDENTIALS\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+    active_patterns = [
+        r'(?<![\#\/])\bAPI_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        r'(?<![\#\/])\bSECRET_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        r'(?<![\#\/])\bACCESS_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        r'(?<![\#\/])\bTOKEN\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        r'(?<![\#\/])\bPASSWORD\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        r'(?<![\#\/])\bCREDENTIALS\s*[:=]\s*["\']?[^"\'\s]+["\']?',
     ]
+    
+    commented_patterns = [
+        r'[\#\/].*\b(API_?KEY|SECRET_?KEY|ACCESS_?KEY|TOKEN|PASSWORD|CREDENTIALS)\s*[:=]\s*["\']?[^"\'\s]+["\']?'
+    ]
+    
+    patterns = commented_patterns if clean_commented else active_patterns
 
-    # Config files to scan (multi-language support)
+    # Config files to scan
     config_files = [
         r'settings\.py$', r'config\.py$', r'secrets\.py$',
         r'\.env$', r'config\.js$', r'application\.properties$',
         r'application\.yml$', r'config\.php$', r'\.env\..*$',
         r'config\.json$'
     ]
+    
+    if extensions:
+        config_files = [fr'\.{ext}$' for ext in extensions]
 
-    # First collect all files to scan
+    # Collect all files to scan
     all_files = []
     for root, _, files in os.walk(directory):
         for file in files:
@@ -56,88 +106,82 @@ def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]
                 with open(file_path, 'rb') as f:
                     content = f.read().decode('latin-1')
 
-            # Check each line
-            for line_num, line in enumerate(content.splitlines(), 1):
-                for pattern in sensitive_patterns:
+            lines = content.splitlines()
+            modified = False
+            
+            for line_num, line in enumerate(lines, 1):
+                if should_skip_line(line, ignore_patterns):
+                    continue
+                    
+                for pattern in patterns:
                     if re.search(pattern, line, re.IGNORECASE):
                         issues.append({
                             'file': file_path,
                             'line': line_num,
                             'content': line.strip(),
-                            'pattern': pattern
+                            'pattern': pattern,
+                            'commented': line.strip().startswith(('#', '//'))
                         })
-                        break  # Only report first match per line
+                        
+                        if auto_fix or clean_commented:
+                            ext = os.path.splitext(file_path)[1].lower()
+                            if ext in ('.py', '.sh', '.php', '.js', '.rb'):
+                                prefix = '# '
+                            elif ext in ('.java', '.c', '.cpp', '.h', '.cs'):
+                                prefix = '// '
+                            elif ext in ('.html', '.xml'):
+                                prefix = '<!-- '
+                                suffix = ' -->'
+                            else:
+                                prefix = '# '
+                            
+                            if clean_commented:
+                                lines[line_num-1] = ''
+                            else:
+                                if ext in ('.html', '.xml'):
+                                    lines[line_num-1] = f"{prefix}{lines[line_num-1].rstrip()}{suffix}\n"
+                                else:
+                                    lines[line_num-1] = f"{prefix}{lines[line_num-1]}"
+                            
+                            modified = True
+                        break
+
+            if modified:
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write('\n'.join(lines))
+                    modified_files.add(file_path)
+                except Exception as e:
+                    if verbose:
+                        print(f"{Fore.RED}Failed to modify {file_path}: {e}{Style.RESET_ALL}")
 
         except Exception as e:
             if verbose:
                 print(f"{Fore.YELLOW}⚠️ Could not scan {file_path}: {e}{Style.RESET_ALL}")
 
-    # Clear progress bar
+    # Display results
     print("\n" + "="*50 + "\n")
 
-    # Display all issues after scanning completes
     if issues:
         print(f"{Fore.RED}❌ SECURITY ISSUES FOUND ({len(issues)}){Style.RESET_ALL}\n")
         for issue in issues:
-            print(f"{Fore.YELLOW}File:{Style.RESET_ALL} {issue['file']}")
+            status = "Commented" if issue['commented'] else "Active"
+            color = Fore.YELLOW if issue['commented'] else Fore.RED
+            print(f"{color}[{status}]{Style.RESET_ALL} {Fore.YELLOW}File:{Style.RESET_ALL} {issue['file']}")
             print(f"{Fore.CYAN}Line {issue['line']}:{Style.RESET_ALL} {issue['content']}")
             print(f"{Fore.MAGENTA}Pattern:{Style.RESET_ALL} {issue['pattern']}")
             print("-" * 50)
         
-        # Ask user if they want to modify the files
-        user_input = input(f"\n{Fore.YELLOW}Do you want to comment out these sensitive lines? (Yes/No): {Style.RESET_ALL}").strip().lower()
-        
-        if user_input in ('y', 'yes'):
-            # Process each file to comment out sensitive lines
-            modified_files = set()
-            
-            for issue in issues:
-                file_path = issue['file']
-                line_num = issue['line']
-                
-                # Read the file content
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        lines = f.readlines()
-                except UnicodeDecodeError:
-                    with open(file_path, 'rb') as f:
-                        content = f.read().decode('latin-1')
-                    lines = content.splitlines(True)
-                
-                # Determine comment style based on file extension
-                ext = os.path.splitext(file_path)[1].lower()
-                if ext in ('.py', '.sh', '.php', '.js', '.rb'):
-                    comment_prefix = '# '
-                elif ext in ('.java', '.c', '.cpp', '.h', '.cs'):
-                    comment_prefix = '// '
-                elif ext in ('.html', '.xml'):
-                    comment_prefix = '<!-- '
-                    comment_suffix = ' -->'
-                else:
-                    comment_prefix = '# '  # default to hash style
-                
-                # Comment out the sensitive line
-                if ext in ('.html', '.xml'):
-                    lines[line_num-1] = f"{comment_prefix}{lines[line_num-1].rstrip()}{comment_suffix}\n"
-                else:
-                    lines[line_num-1] = f"{comment_prefix}{lines[line_num-1]}"
-                
-                # Write back to file
-                try:
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.writelines(lines)
-                    modified_files.add(file_path)
-                except Exception as e:
-                    print(f"{Fore.RED}Failed to modify {file_path}: {e}{Style.RESET_ALL}")
-            
-            # Print summary of modifications
-            if modified_files:
-                print(f"\n{Fore.GREEN}✅ Successfully commented out sensitive lines in {len(modified_files)} files:{Style.RESET_ALL}")
-                for modified_file in modified_files:
-                    print(f" - {modified_file}")
-            else:
-                print(f"{Fore.YELLOW}No files were modified.{Style.RESET_ALL}")
+        if not auto_fix and not clean_commented and any(not issue['commented'] for issue in issues):
+            user_input = input(f"\n{Fore.YELLOW}Do you want to comment out active secrets? (Yes/No): {Style.RESET_ALL}").strip().lower()
+            if user_input in ('y', 'yes'):
+                return scan_directory(directory, verbose, True, False, extensions)
     else:
         print(f"{Fore.GREEN}✅ No security issues found{Style.RESET_ALL}")
+
+    if modified_files:
+        print(f"\n{Fore.GREEN}✅ Modified {len(modified_files)} files:{Style.RESET_ALL}")
+        for modified_file in modified_files:
+            print(f" - {modified_file}")
 
     return issues
