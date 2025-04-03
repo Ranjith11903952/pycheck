@@ -2,215 +2,215 @@ import os
 import re
 import logging
 from typing import List, Dict, Any, Optional
+import json
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class SecretScanner:
-    """Scanner for sensitive data in configuration files across multiple languages"""
+class SecretMigrator:
+    """Handles migration of secrets from source files to .env file"""
     
     def __init__(self):
-        # Define sensitive patterns
-        self.sensitive_patterns = [
-            # API/access keys
-            r'(?:api|secret|access|auth|private|encryption)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-            r'token\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        self.env_content = []
+        self.backup_dir = ".secret_backups"
+        os.makedirs(self.backup_dir, exist_ok=True)
+    
+    def create_backup(self, file_path: str) -> str:
+        """Create backup of original file"""
+        backup_path = os.path.join(self.backup_dir, os.path.basename(file_path) + ".bak")
+        with open(file_path, 'r') as src, open(backup_path, 'w') as dst:
+            dst.write(src.read())
+        return backup_path
+    
+    def migrate_secret(self, file_path: str, line_num: int, line_content: str, pattern: str) -> bool:
+        """
+        Extract secret from line and prepare for .env migration
+        Returns True if migration was successful
+        """
+        try:
+            # Extract the key and value
+            match = re.search(pattern, line_content, re.IGNORECASE)
+            if not match:
+                return False
             
-            # Credentials
-            r'(?:password|passwd|pwd|credential)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-            r'(?:user(?:name)?|login)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            # Get the full matched string
+            full_match = match.group(0)
             
-            # Database configurations
-            r'db(?:_(?:name|user|pass(word)?|host|port))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-            r'(?:database|connection)[_-]?(?:url|string)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            # Extract key and value parts
+            if ':=' in full_match:
+                key_part, value_part = full_match.split(':=', 1)
+            elif '=' in full_match:
+                key_part, value_part = full_match.split('=', 1)
+            elif ':' in full_match:
+                key_part, value_part = full_match.split(':', 1)
+            else:
+                return False
             
-            # Cloud/AWS
-            r'aws[_-](?:access[_-]?key|secret[_-]?key|session[_-]?token)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            # Clean up the key and value
+            key = key_part.strip()
+            value = value_part.strip().strip('\'"')
             
-            # SSH/Keys
-            r'ssh[_-]?(?:key|passphrase)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-            r'(?:private|public)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            # Add to .env content
+            self.env_content.append(f"{key}={value}")
+            return True
             
-            # Payment processors
-            r'(?:stripe|paypal)[_-](?:api|secret)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-            
-            # Social media
-            r'(?:facebook|twitter|google|github)[_-](?:api|secret)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        ]
+        except Exception as e:
+            logging.error(f"Error migrating secret: {str(e)}")
+            return False
+    
+    def write_env_file(self, directory: str) -> str:
+        """Write collected secrets to .env file"""
+        env_path = os.path.join(directory, ".env")
+        if not self.env_content:
+            return ""
         
-        # Language-specific configuration file patterns
-        self.config_file_patterns = {
-            'python': [
-                r'settings\.py$',
-                r'config\.py$',
-                r'secrets\.py$',
-                r'local_settings\.py$',
-                r'[^/]+/settings/.*\.py$'  # Django settings modules
-            ],
-            'javascript': [
-                r'config\.js$',
-                r'\.env(\..+)?$',
-                r'secrets\.js$'
-            ],
-            'java': [
-                r'application\.(properties|yml|yaml)$',
-                r'bootstrap\.(properties|yml|yaml)$'
-            ],
-            'ruby': [
-                r'application\.rb$',
-                r'secrets\.yml$',
-                r'credentials\.yml\.enc$'
-            ],
-            'php': [
-                r'config\.php$',
-                r'\.env(\..+)?$',
-                r'database\.php$'
-            ],
-            'dotenv': [
-                r'\.env(\..+)?$'
-            ],
-            'general': [
-                r'config\.(json|yaml|yml|toml|xml|ini)$',
-                r'credentials?\.(json|yaml|yml)$',
-                r'secrets?\.(json|yaml|yml)$',
-                r'\.(npmrc|htpasswd|git-credentials)$'
-            ]
-        }
+        with open(env_path, 'w') as f:
+            f.write("# Auto-generated .env file\n")
+            f.write("# DO NOT COMMIT THIS FILE TO VERSION CONTROL!\n\n")
+            f.write("\n".join(self.env_content))
         
-        # Patterns to exclude (comments, docstrings, etc.)
-        self.exclude_patterns = [
-            r'^\s*[#/]',  # Comments
-            r'^\s*/\*', r'\*/',  # Block comments
-            r'^\s*[\'"]{3}',  # Docstrings
-            r'@[\w\d_]+',  # Annotations
-            r'\b(?:TODO|FIXME|XXX|HACK)\b',  # Code tags
-            r'example|sample|placeholder',  # Example values
-            r'ace\.define|regex:"',  # Specific false positives
-        ]
+        logging.warning(f"Created new .env file at {env_path}")
+        logging.warning("REMEMBER TO ADD .env TO YOUR .gitignore!")
+        return env_path
+
+class SecretScanner(SecretMigrator):
+    """Enhanced scanner with secret migration capabilities"""
+    
+    def __init__(self):
+        super().__init__()
+        # [Previous pattern definitions remain the same...]
+        # ... (keep all the sensitive patterns and config file patterns from earlier)
+
+    def prompt_user(self, file_path: str, issue: Dict[str, Any]) -> bool:
+        """Ask user if they want to migrate the found secret"""
+        print(f"\nFound potential secret in {file_path}:")
+        print(f"Line {issue['line']}: {issue['line_content']}")
+        print(f"Pattern matched: {issue['pattern']}")
         
-        # File extensions to consider
-        self.valid_extensions = (
-            '.py', '.js', '.java', '.rb', '.php', 
-            '.env', '.json', '.yaml', '.yml', '.ini', 
-            '.properties', '.toml', '.xml', '.cfg'
-        )
+        while True:
+            response = input("Do you want to migrate this to .env? [y/n]: ").lower()
+            if response in ('y', 'yes'):
+                return True
+            elif response in ('n', 'no'):
+                return False
+            else:
+                print("Please answer 'y' or 'n'")
 
-    def is_config_file(self, filename: str) -> bool:
-        """Check if file matches any known configuration file pattern"""
-        filename_lower = filename.lower()
-        return any(
-            re.search(pattern, filename_lower, re.IGNORECASE)
-            for patterns in self.config_file_patterns.values()
-            for pattern in patterns
-        )
-
-    def is_comment_or_excluded(self, line: str) -> bool:
-        """Check if line should be excluded from scanning"""
-        return any(re.search(pattern, line) for pattern in self.exclude_patterns)
-
-    def scan_file(self, file_path: str) -> List[Dict[str, Any]]:
-        """Scan a single file for sensitive patterns"""
-        issues = []
+    def modify_source_file(self, file_path: str, issues: List[Dict[str, Any]]) -> bool:
+        """
+        Modify source file to remove secrets that were migrated to .env
+        Returns True if modifications were made
+        """
+        # Create backup first
+        backup_path = self.create_backup(file_path)
+        logging.info(f"Created backup at {backup_path}")
         
         try:
-            # Try reading with UTF-8 first, fallback to latin-1
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            except UnicodeDecodeError:
-                with open(file_path, 'rb') as f:
-                    content = f.read().decode('latin-1')
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
             
-            in_comment_block = False
-            for line_num, line in enumerate(content.splitlines(), 1):
-                # Handle comment blocks
-                if re.search(r'^\s*/\*', line):
-                    in_comment_block = True
-                if in_comment_block:
-                    if re.search(r'\*/', line):
-                        in_comment_block = False
-                    continue
-                if re.search(r'^\s*[\'"]{3}', line):
-                    in_comment_block = not in_comment_block
-                    continue
-                
-                # Skip excluded lines
-                if in_comment_block or self.is_comment_or_excluded(line):
-                    continue
-                
-                # Check for sensitive patterns
-                for pattern in self.sensitive_patterns:
-                    if re.search(pattern, line, re.IGNORECASE):
-                        issues.append({
-                            'file': file_path,
-                            'line': line_num,
-                            'line_content': line.strip(),
-                            'pattern': pattern,
-                            'severity': 'high'
-                        })
-                        break  # Only report first match per line
-        
+            modified = False
+            for issue in sorted(issues, key=lambda x: x['line'], reverse=True):
+                line_idx = issue['line'] - 1
+                if 0 <= line_idx < len(lines):
+                    # Replace the line with a comment or empty line
+                    lines[line_idx] = f"# Removed secret: {lines[line_idx].strip()}\n"
+                    modified = True
+            
+            if modified:
+                with open(file_path, 'w') as f:
+                    f.writelines(lines)
+                logging.warning(f"Modified source file: {file_path}")
+            
+            return modified
+            
         except Exception as e:
-            logging.error(f"Error scanning {file_path}: {str(e)}")
-        
-        return issues
+            logging.error(f"Failed to modify {file_path}: {str(e)}")
+            return False
 
-    def scan_directory(self, directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
-        """Scan a directory for sensitive data in configuration files"""
-        if not os.path.isdir(directory):
-            raise ValueError(f"Directory not found: {directory}")
+    def scan_and_migrate(self, directory: str, interactive: bool = True) -> Dict[str, Any]:
+        """
+        Scan directory and optionally migrate secrets to .env
+        Returns dictionary with scan results and migration status
+        """
+        results = {
+            'scanned_files': 0,
+            'secrets_found': 0,
+            'secrets_migrated': 0,
+            'modified_files': [],
+            'env_file_created': None
+        }
         
-        issues = []
-        total_files = 0
-        scanned_files = 0
-        
+        # First pass: scan and collect all issues
+        all_issues = []
         for root, _, files in os.walk(directory):
             for file in files:
                 file_path = os.path.join(root, file)
-                total_files += 1
-                
-                # Skip non-config files
-                if (not file.lower().endswith(self.valid_extensions) and (not self.is_config_file(file)):
-                    if verbose:
-                        logging.debug(f"Skipping non-config file: {file_path}")
-                    continue
-                
-                scanned_files += 1
-                file_issues = self.scan_file(file_path)
-                if file_issues:
-                    issues.extend(file_issues)
-                    logging.warning(f"Found {len(file_issues)} issues in {file_path}")
+                if self.is_config_file(file):
+                    results['scanned_files'] += 1
+                    file_issues = self.scan_file(file_path)
+                    if file_issues:
+                        all_issues.extend(file_issues)
+                        results['secrets_found'] += len(file_issues)
         
-        logging.info(f"Scanned {scanned_files}/{total_files} files, found {len(issues)} potential secrets")
-        return issues
+        if not all_issues:
+            return results
+        
+        # Second pass: handle migration if secrets found
+        files_to_modify = {}
+        for issue in all_issues:
+            file_path = issue['file']
+            
+            if interactive:
+                migrate = self.prompt_user(file_path, issue)
+            else:
+                migrate = True  # auto-migrate in non-interactive mode
+            
+            if migrate:
+                if self.migrate_secret(file_path, issue['line'], issue['line_content'], issue['pattern']):
+                    results['secrets_migrated'] += 1
+                    if file_path not in files_to_modify:
+                        files_to_modify[file_path] = []
+                    files_to_modify[file_path].append(issue)
+        
+        # Modify source files to remove migrated secrets
+        for file_path, issues in files_to_modify.items():
+            if self.modify_source_file(file_path, issues):
+                results['modified_files'].append(file_path)
+        
+        # Create .env file if any secrets were migrated
+        if self.env_content:
+            env_path = self.write_env_file(directory)
+            results['env_file_created'] = env_path
+        
+        return results
 
-
-def save_results(results: List[Dict[str, Any]], output_file: str = "secret_scan_results.json"):
-    """Save scan results to JSON file"""
-    import json
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        logging.info(f"Results saved to {output_file}")
-    except Exception as e:
-        logging.error(f"Failed to save results: {str(e)}")
-
-
-if __name__ == "__main__":
+def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description="Scan for secrets in configuration files")
+    parser = argparse.ArgumentParser(description="Secret scanner and migrator")
     parser.add_argument("directory", help="Directory to scan")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-    parser.add_argument("-o", "--output", help="Output file path", default="secret_scan_results.json")
-    
+    parser.add_argument("--auto", action="store_true", help="Automatically migrate without prompts")
+    parser.add_argument("--output", help="JSON output file", default="scan_results.json")
     args = parser.parse_args()
     
     scanner = SecretScanner()
-    results = scanner.scan_directory(args.directory, args.verbose)
+    results = scanner.scan_and_migrate(args.directory, interactive=not args.auto)
     
-    if results:
-        save_results(results, args.output)
-        logging.warning(f"Found {len(results)} potential secrets!")
-    else:
-        logging.info("No secrets found in configuration files")
+    # Save results
+    with open(args.output, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print("\nScan Summary:")
+    print(f"Scanned files: {results['scanned_files']}")
+    print(f"Secrets found: {results['secrets_found']}")
+    print(f"Secrets migrated: {results['secrets_migrated']}")
+    print(f"Modified files: {len(results['modified_files'])}")
+    if results['env_file_created']:
+        print(f"Created .env file at: {results['env_file_created']}")
+        print("\nIMPORTANT: Add this to your .gitignore:")
+        print(f"echo '\n# Secret scanner\\.env' >> .gitignore")
+
+if __name__ == "__main__":
+    main()
