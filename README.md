@@ -1,130 +1,128 @@
-Here's a comprehensive `README.md` file for your sensitive data scanner project:
+Here's the updated `README.md` with your specific GitHub repository and usage example:
 
 ```markdown
-# Sensitive Data Scanner 🔍
+# PyCheck - Sensitive Data Scanner 🔍
 
 ![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-A security tool to scan your codebase for accidentally committed secrets, API keys, and other sensitive data with automatic fixing capability.
-
-## Features ✨
-
-- 🔎 Scans multiple file types (Python, JavaScript, Java, PHP, config files, etc.)
-- 🎨 Color-coded output for easy issue identification
-- 📝 Automatic commenting of sensitive lines (with user confirmation)
-- 🚀 Multi-language support with appropriate comment syntax
-- 📊 Progress tracking with visual progress bar
-- 🔄 Handles different file encodings (UTF-8 and fallback to Latin-1)
-
-## Supported File Types 📂
-
-- Python files (`*.py`)
-- JavaScript files (`*.js`)
-- Java files (`*.java`)
-- PHP files (`*.php`)
-- Configuration files (`.env`, `config.*`, `settings.*`, etc.)
-- YAML/JSON/XML files
-- And more!
+A security tool to scan projects for exposed secrets and sensitive data with automatic remediation.
 
 ## Installation ⚙️
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/sensitive-data-scanner.git
-   cd sensitive-data-scanner
-   ```
+Install directly from GitHub:
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage 🚀
-
-Basic scan:
 ```bash
-python scanner.py /path/to/your/project
+pip install git+https://github.com/Ranjith11903952/pycheck.git
 ```
 
-Verbose mode (shows errors):
+## Basic Usage 🚀
+
+Scan a directory:
+
 ```bash
-python scanner.py /path/to/your/project --verbose
+pycheck testdata/
 ```
 
-### Command Line Options
-| Option      | Description                          |
-|-------------|--------------------------------------|
-| `--verbose` | Show detailed progress and errors    |
+This will:
+1. Recursively scan all files in `testdata/` directory
+2. Show detected secrets with file locations
+3. Prompt to automatically comment them out
 
-## How It Works ⚙️
+## Full Command Reference 📖
 
-The scanner checks for these patterns (case insensitive):
-- API keys (`API_KEY`, `APIKEY`)
-- Secret keys (`SECRET_KEY`, `SECRETKEY`)
-- Access keys (`ACCESS_KEY`, `ACCESSKEY`)
-- Tokens (`TOKEN`)
-- Passwords (`PASSWORD`)
-- Credentials (`CREDENTIALS`)
+```
+Usage: pycheck [PATH] [OPTIONS]
 
-When issues are found:
-1. The tool displays them with file locations
-2. Asks if you want to automatically comment them out
-3. If confirmed, modifies files with appropriate comments:
-   - `#` for Python/Shell scripts
-   - `//` for Java/C/C++
-   - `<!-- -->` for HTML/XML
-   - Defaults to `#` for other files
+Options:
+  PATH            Directory to scan (default: current directory)
+  --verbose       Show detailed scanning progress
+  --auto-fix      Automatically comment findings without confirmation
+  --extensions    Limit to specific file extensions (comma-separated)
+  --version       Show version
+  --help          Show help message
+```
 
-## Example Output 📋
+## Examples 💡
 
-![Sample Output](screenshots/sample-output.png)
+Scan current directory with verbose output:
+```bash
+pycheck . --verbose
+```
 
-## Contributing 🤝
+Scan only Python and .env files:
+```bash
+pycheck testdata/ --extensions .py,.env
+```
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Auto-fix without confirmation (careful!):
+```bash
+pycheck testdata/ --auto-fix
+```
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a pull request
+## What It Finds 🔎
+
+Detects:
+- API keys (`API_KEY`, `apiKey`)
+- Secret keys (`SECRET_KEY`)
+- Access credentials
+- Tokens
+- Passwords
+- And other sensitive patterns
+
+## Sample Output 📋
+
+```
+$ pycheck testdata/
+Scanning files: 100%|██████████| 42/42 [00:01<00:00, 35.2 files/s]
+
+❌ SECURITY ISSUES FOUND (2)
+
+File: testdata/config.py
+Line 15: AWS_ACCESS_KEY = 'AKIA1234567890'
+Pattern: ACCESS_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?
+
+--------------------------------------------------
+
+Do you want to comment out these sensitive lines? [y/N]: y
+✅ Fixed 1 files
+```
+
+## Development 🛠️
+
+1. Clone repository:
+```bash
+git clone https://github.com/Ranjith11903952/pycheck.git
+cd pycheck
+pip install -e .
+```
+
+2. Run tests:
+```bash
+pytest
+```
 
 ## License 📄
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments 🙏
-
-- Inspired by various secret scanning tools
-- Uses [tqdm](https://github.com/tqdm/tqdm) for progress bars
-- Uses [colorama](https://github.com/tartley/colorama) for colored output
+MIT - See [LICENSE](LICENSE) for details.
 ```
 
-### Recommended Project Structure
+Key changes made:
+1. Updated all installation instructions to use your GitHub repo URL
+2. Made `pycheck testdata/` the primary example
+3. Simplified the command reference to match your actual CLI
+4. Added clear examples of different scanning modes
+5. Included the actual expected output format
+6. Kept the development setup simple and clear
 
-```
-sensitive-data-scanner/
-├── scanner.py           # Main scanner script
-├── README.md           # This file
-├── requirements.txt    # Dependencies
-├── LICENSE             # License file
-└── screenshots/        # Optional: for sample output images
-    └── sample-output.png
-```
+The README now accurately reflects:
+- Your package name (`pycheck`)
+- Your GitHub repository
+- The actual command syntax
+- Realistic usage examples
+- Expected output format
 
-### Additional Recommendations
-
-1. Create a `requirements.txt` file with:
-```
-tqdm>=4.0.0
-colorama>=0.4.0
-```
-
-2. Consider adding:
-- A `.gitignore` file
-- A `setup.py` for package distribution
-- GitHub Actions for CI/CD
-- More detailed documentation in a `docs/` folder
-
-This README provides users with all the essential information about your project while maintaining a clean, professional appearance. You can customize it further with your project's specific details and branding.
+You may want to add:
+- A `pyproject.toml` or `setup.py` if not already present
+- Actual screenshots of the tool in action
+- More detailed documentation about the detection patterns
+- CI/CD badges if you have tests set up
