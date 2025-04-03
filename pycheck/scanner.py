@@ -1,181 +1,216 @@
 import os
 import re
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def scan_secret_files(directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
-    """
-    Scans a directory for configuration files that typically contain secrets.
-    Focuses on files like settings.py, .env, config files, etc.
-
-    Args:
-        directory (str): The directory to scan.
-        verbose (bool): If True, print detailed logs for skipped files.
-
-    Returns:
-        List[Dict[str, Any]]: A list of issues found, each represented as a dictionary.
-    """
-    issues = []
-
-    # Sensitive patterns (same as before)
-    sensitive_patterns = [
-        r'API_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'SECRET_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'ACCESS_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'TOKEN\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'PASSWORD\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'CREDENTIALS\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'AUTH_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'PRIVATE_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'USERNAME\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'USER_?NAME\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'DB_?NAME\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'DB_?PASSWORD\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'DB_?HOST\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'DATABASE_?URL\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'CONNECTION_?STRING\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'AWS_?ACCESS_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'AWS_?SECRET_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'SSH_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'PRIVATE_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'PUBLIC_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-        r'ENCRYPTION_?KEY\s*[:=]\s*["\']?[^"\'\s]+["\']?'
-    ]
-
-    # Patterns to exclude (same as before)
-    exclude_patterns = [
-        r'^\s*#',
-        r'^\s*//',
-        r'^\s*/\*',
-        r'\*/',
-        r'^\s*[\'\"]{3}',
-        r'@[\w\d_]+',
-        r'\b(?:TODO|FIXME|XXX|HACK)\b',
-        r'ace\.define',
-        r'regex:"',
-        r'showUsername\s*:',
-        r'userpic__username\s*:',
-    ]
-
-    # Focus only on configuration files that typically contain secrets
-    secret_file_patterns = [
-        # Python
-        r'settings\.py$',
-        r'config\.py$',
-        r'secrets\.py$',
-        r'local_settings\.py$',
-        
-        # Environment files
-        r'\.env$',
-        r'\.env\.local$',
-        r'\.env\.dev$',
-        r'\.env\.prod$',
-        r'\.env\.example$',
-        
-        # Configuration files
-        r'config\.json$',
-        r'config\.yaml$',
-        r'config\.yml$',
-        r'configuration\.json$',
-        r'appsettings\.json$',
-        r'\.properties$',
-        
-        # Other common secret files
-        r'credentials\.json$',
-        r'secrets\.json$',
-        r'keys\.json$',
-        r'\.npmrc$',
-        r'\.htpasswd$',
-        r'\.git-credentials$'
-    ]
-
-    for root, _, files in os.walk(directory):
-        for file in files:
-            file_path = os.path.join(root, file)
+class SecretScanner:
+    """Scanner for sensitive data in configuration files across multiple languages"""
+    
+    def __init__(self):
+        # Define sensitive patterns
+        self.sensitive_patterns = [
+            # API/access keys
+            r'(?:api|secret|access|auth|private|encryption)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            r'token\s*[:=]\s*["\']?[^"\'\s]+["\']?',
             
-            # Check if file matches any of our secret file patterns
-            if not any(re.search(pattern, file, re.IGNORECASE) for pattern in secret_file_patterns):
-                if verbose:
-                    logging.info(f"Skipping non-secret file: {file_path}")
-                continue
+            # Credentials
+            r'(?:password|passwd|pwd|credential)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            r'(?:user(?:name)?|login)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            
+            # Database configurations
+            r'db(?:_(?:name|user|pass(word)?|host|port))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            r'(?:database|connection)[_-]?(?:url|string)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            
+            # Cloud/AWS
+            r'aws[_-](?:access[_-]?key|secret[_-]?key|session[_-]?token)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            
+            # SSH/Keys
+            r'ssh[_-]?(?:key|passphrase)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            r'(?:private|public)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            
+            # Payment processors
+            r'(?:stripe|paypal)[_-](?:api|secret)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+            
+            # Social media
+            r'(?:facebook|twitter|google|github)[_-](?:api|secret)[_-]?key\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+        ]
+        
+        # Language-specific configuration file patterns
+        self.config_file_patterns = {
+            'python': [
+                r'settings\.py$',
+                r'config\.py$',
+                r'secrets\.py$',
+                r'local_settings\.py$',
+                r'[^/]+/settings/.*\.py$'  # Django settings modules
+            ],
+            'javascript': [
+                r'config\.js$',
+                r'\.env(\..+)?$',
+                r'secrets\.js$'
+            ],
+            'java': [
+                r'application\.(properties|yml|yaml)$',
+                r'bootstrap\.(properties|yml|yaml)$'
+            ],
+            'ruby': [
+                r'application\.rb$',
+                r'secrets\.yml$',
+                r'credentials\.yml\.enc$'
+            ],
+            'php': [
+                r'config\.php$',
+                r'\.env(\..+)?$',
+                r'database\.php$'
+            ],
+            'dotenv': [
+                r'\.env(\..+)?$'
+            ],
+            'general': [
+                r'config\.(json|yaml|yml|toml|xml|ini)$',
+                r'credentials?\.(json|yaml|yml)$',
+                r'secrets?\.(json|yaml|yml)$',
+                r'\.(npmrc|htpasswd|git-credentials)$'
+            ]
+        }
+        
+        # Patterns to exclude (comments, docstrings, etc.)
+        self.exclude_patterns = [
+            r'^\s*[#/]',  # Comments
+            r'^\s*/\*', r'\*/',  # Block comments
+            r'^\s*[\'"]{3}',  # Docstrings
+            r'@[\w\d_]+',  # Annotations
+            r'\b(?:TODO|FIXME|XXX|HACK)\b',  # Code tags
+            r'example|sample|placeholder',  # Example values
+            r'ace\.define|regex:"',  # Specific false positives
+        ]
+        
+        # File extensions to consider
+        self.valid_extensions = (
+            '.py', '.js', '.java', '.rb', '.php', 
+            '.env', '.json', '.yaml', '.yml', '.ini', 
+            '.properties', '.toml', '.xml', '.cfg'
+        )
 
-            logging.info(f"Scanning secret file: {file_path}")
+    def is_config_file(self, filename: str) -> bool:
+        """Check if file matches any known configuration file pattern"""
+        filename_lower = filename.lower()
+        return any(
+            re.search(pattern, filename_lower, re.IGNORECASE)
+            for patterns in self.config_file_patterns.values()
+            for pattern in patterns
+        )
+
+    def is_comment_or_excluded(self, line: str) -> bool:
+        """Check if line should be excluded from scanning"""
+        return any(re.search(pattern, line) for pattern in self.exclude_patterns)
+
+    def scan_file(self, file_path: str) -> List[Dict[str, Any]]:
+        """Scan a single file for sensitive patterns"""
+        issues = []
+        
+        try:
+            # Try reading with UTF-8 first, fallback to latin-1
             try:
-                # Try reading the file with UTF-8 encoding first
                 with open(file_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                    content = f.read()
             except UnicodeDecodeError:
-                # If UTF-8 fails, try reading the file as binary
-                try:
-                    with open(file_path, 'rb') as f:
-                        lines = [line.decode('latin-1') for line in f.readlines()]
-                except Exception as e:
-                    logging.error(f"Error reading file {file_path}: {e}")
-                    continue
-
+                with open(file_path, 'rb') as f:
+                    content = f.read().decode('latin-1')
+            
             in_comment_block = False
-            for line_num, line in enumerate(lines, 1):
-                # Skip lines that match exclude patterns
-                if any(re.search(pattern, line) for pattern in exclude_patterns):
-                    continue
-
-                # Skip multi-line comments and docstrings
-                if re.search(r'^\s*/\*', line):  # Start of multi-line comment
+            for line_num, line in enumerate(content.splitlines(), 1):
+                # Handle comment blocks
+                if re.search(r'^\s*/\*', line):
                     in_comment_block = True
                 if in_comment_block:
-                    if re.search(r'\*/', line):  # End of multi-line comment
+                    if re.search(r'\*/', line):
                         in_comment_block = False
                     continue
-                if re.search(r'^\s*[\'\"]{3}', line):  # Start or end of docstring
+                if re.search(r'^\s*[\'"]{3}', line):
                     in_comment_block = not in_comment_block
                     continue
-                if in_comment_block:
+                
+                # Skip excluded lines
+                if in_comment_block or self.is_comment_or_excluded(line):
                     continue
-
-                # Check for sensitive data
-                for pattern in sensitive_patterns:
+                
+                # Check for sensitive patterns
+                for pattern in self.sensitive_patterns:
                     if re.search(pattern, line, re.IGNORECASE):
                         issues.append({
                             'file': file_path,
                             'line': line_num,
                             'line_content': line.strip(),
-                            'pattern': pattern  # Add which pattern was matched
+                            'pattern': pattern,
+                            'severity': 'high'
                         })
-                        break  # Stop checking other patterns if a match is found
+                        break  # Only report first match per line
+        
+        except Exception as e:
+            logging.error(f"Error scanning {file_path}: {str(e)}")
+        
+        return issues
 
-    return issues
+    def scan_directory(self, directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
+        """Scan a directory for sensitive data in configuration files"""
+        if not os.path.isdir(directory):
+            raise ValueError(f"Directory not found: {directory}")
+        
+        issues = []
+        total_files = 0
+        scanned_files = 0
+        
+        for root, _, files in os.walk(directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+                total_files += 1
+                
+                # Skip non-config files
+                if (not file.lower().endswith(self.valid_extensions) and (not self.is_config_file(file)):
+                    if verbose:
+                        logging.debug(f"Skipping non-config file: {file_path}")
+                    continue
+                
+                scanned_files += 1
+                file_issues = self.scan_file(file_path)
+                if file_issues:
+                    issues.extend(file_issues)
+                    logging.warning(f"Found {len(file_issues)} issues in {file_path}")
+        
+        logging.info(f"Scanned {scanned_files}/{total_files} files, found {len(issues)} potential secrets")
+        return issues
 
 
-def save_results_to_file(issues: List[Dict[str, Any]], output_file: str = "secret_scan_results.json"):
-    """
-    Saves the scan results to a file in JSON format.
-
-    Args:
-        issues (List[Dict[str, Any]]): The list of issues to save.
-        output_file (str): The output file path.
-    """
+def save_results(results: List[Dict[str, Any]], output_file: str = "secret_scan_results.json"):
+    """Save scan results to JSON file"""
     import json
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(issues, f, indent=4, ensure_ascii=False)
-        logging.info(f"Secret scan results saved to {output_file}")
-    except (IOError, PermissionError) as e:
-        logging.error(f"Error saving results to {output_file}: {e}")
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        logging.info(f"Results saved to {output_file}")
+    except Exception as e:
+        logging.error(f"Failed to save results: {str(e)}")
 
 
 if __name__ == "__main__":
-    # Example usage
-    directory_to_scan = "path/to/your/directory"
-    verbose = False  # Set to True to print detailed logs for skipped files
-    issues_found = scan_secret_files(directory_to_scan, verbose)
-
-    if issues_found:
-        logging.warning(f"Found {len(issues_found)} potential secrets in configuration files.")
-        for issue in issues_found:
-            logging.warning(f"Secret in {issue['file']}, line {issue['line']}: {issue['line_content']}")
-        save_results_to_file(issues_found)
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Scan for secrets in configuration files")
+    parser.add_argument("directory", help="Directory to scan")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("-o", "--output", help="Output file path", default="secret_scan_results.json")
+    
+    args = parser.parse_args()
+    
+    scanner = SecretScanner()
+    results = scanner.scan_directory(args.directory, args.verbose)
+    
+    if results:
+        save_results(results, args.output)
+        logging.warning(f"Found {len(results)} potential secrets!")
     else:
-        logging.info("No secrets found in configuration files.")
+        logging.info("No secrets found in configuration files")
