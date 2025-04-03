@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 from typing import List, Dict, Any
 from tqdm import tqdm
 from colorama import Fore, Style, init
@@ -10,7 +9,7 @@ init(autoreset=True)
 
 def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]]:
     """
-    Scans directory for sensitive data with colored output and progress tracking
+    Scans directory for sensitive data with improved output formatting
     
     Args:
         directory: Path to directory to scan
@@ -33,19 +32,13 @@ def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]
 
     # Config files to scan (multi-language support)
     config_files = [
-        # Python
         r'settings\.py$', r'config\.py$', r'secrets\.py$',
-        # JavaScript/Node
-        r'\.env$', r'config\.js$',
-        # Java
-        r'application\.properties$', r'application\.yml$',
-        # PHP
-        r'config\.php$',
-        # General
-        r'\.env\..*$', r'config\.json$'
+        r'\.env$', r'config\.js$', r'application\.properties$',
+        r'application\.yml$', r'config\.php$', r'\.env\..*$',
+        r'config\.json$'
     ]
 
-    # Get all files first for accurate progress
+    # First collect all files to scan
     all_files = []
     for root, _, files in os.walk(directory):
         for file in files:
@@ -73,21 +66,24 @@ def scan_directory(directory: str, verbose: bool = False) -> List[Dict[str, Any]
                             'content': line.strip(),
                             'pattern': pattern
                         })
-                        # Print immediately when found
-                        print(f"\n{Fore.RED}⚠️ SECURITY ISSUE FOUND{Style.RESET_ALL}")
-                        print(f"{Fore.YELLOW}File:{Style.RESET_ALL} {file_path}")
-                        print(f"{Fore.YELLOW}Line {line_num}:{Style.RESET_ALL} {line.strip()}")
-                        print(f"{Fore.CYAN}Pattern:{Style.RESET_ALL} {pattern}")
-                        break
+                        break  # Only report first match per line
 
         except Exception as e:
             if verbose:
                 print(f"{Fore.YELLOW}⚠️ Could not scan {file_path}: {e}{Style.RESET_ALL}")
 
-    # Final summary
+    # Clear progress bar
+    print("\n" + "="*50 + "\n")
+
+    # Display all issues after scanning completes
     if issues:
-        print(f"\n{Fore.RED}❌ Found {len(issues)} security issues!{Style.RESET_ALL}")
+        print(f"{Fore.RED}❌ SECURITY ISSUES FOUND ({len(issues)}){Style.RESET_ALL}\n")
+        for issue in issues:
+            print(f"{Fore.YELLOW}File:{Style.RESET_ALL} {issue['file']}")
+            print(f"{Fore.CYAN}Line {issue['line']}:{Style.RESET_ALL} {issue['content']}")
+            print(f"{Fore.MAGENTA}Pattern:{Style.RESET_ALL} {issue['pattern']}")
+            print("-" * 50)
     else:
-        print(f"\n{Fore.GREEN}✅ No security issues found{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}✅ No security issues found{Style.RESET_ALL}")
 
     return issues
