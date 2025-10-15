@@ -72,8 +72,25 @@ def scan_directory(
     ]
     
     commented_patterns = [
-        r'[\#\/].*\b(API_?KEY|SECRET_?KEY|ACCESS_?KEY|TOKEN|PASSWORD|CREDENTIALS)\s*[:=]\s*["\']?[^"\'\s]+["\']?'
+    # General sensitive key/value pairs
+    r'[\#\/].*\b(API_?KEY|SECRET_?KEY|ACCESS_?KEY|TOKEN|PASSWORD|CREDENTIALS|AUTH_?KEY|PRIVATE_?KEY|CLIENT_?SECRET)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+
+    # Database connection info (Postgres, MySQL, SQLite, Mongo, etc.)
+    r'[\#\/].*\b(DB_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|DATABASE_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+
+    # Generic connection strings like postgresql://user:pass@host:port/db
+    r'[\#\/].*(postgres(?:ql)?|mysql|sqlite|oracle|mssql|mongodb|redis):\/\/[^\'"\s]+',
+
+    # Cloud provider credentials
+    r'[\#\/].*\b(AWS_?(ACCESS|SECRET|SESSION)_?KEY|AZURE_?(CLIENT|TENANT|SECRET|SUBSCRIPTION)_?ID|GCP_?(PROJECT|SERVICE|CREDENTIALS))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+
+    # Email or SMTP credentials
+    r'[\#\/].*\b(EMAIL_?(HOST|USER|USERNAME|PASSWORD|PORT)|SMTP_?(USER|PASSWORD|HOST))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+
+    # Private key or certificate file references
+    r'[\#\/].*\b(PRIVATE_?KEY|SSL_?(CERT|KEY|CA)|CERTIFICATE)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
     ]
+
     
     patterns = commented_patterns if clean_commented else active_patterns
 
