@@ -72,23 +72,14 @@ def scan_directory(
     ]
     
     commented_patterns = [
-    # General sensitive key/value pairs
-    r'[\#\/].*\b(API_?KEY|SECRET_?KEY|ACCESS_?KEY|TOKEN|PASSWORD|CREDENTIALS|AUTH_?KEY|PRIVATE_?KEY|CLIENT_?SECRET)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+    # Hardcoded sensitive dictionary entries (e.g., "HOST": "value")
+    r'["\']\b(DB_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|DATABASE_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|HOST|PORT)\b["\']\s*:\s*["\'](?!os\.environ|os\.getenv)[^"\']+["\']',
 
-    # Database connection info (Postgres, MySQL, SQLite, Mongo, etc.)
-    r'[\#\/].*\b(DB_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|DATABASE_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+    # Regular key=value assignments (non-dict)
+    r'\b(DB_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|DATABASE_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|HOST|PORT)\s*[:=]\s*["\'](?!os\.environ|os\.getenv)[^"\']+["\']',
 
-    # Generic connection strings like postgresql://user:pass@host:port/db
-    r'[\#\/].*(postgres(?:ql)?|mysql|sqlite|oracle|mssql|mongodb|redis):\/\/[^\'"\s]+',
-
-    # Cloud provider credentials
-    r'[\#\/].*\b(AWS_?(ACCESS|SECRET|SESSION)_?KEY|AZURE_?(CLIENT|TENANT|SECRET|SUBSCRIPTION)_?ID|GCP_?(PROJECT|SERVICE|CREDENTIALS))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-
-    # Email or SMTP credentials
-    r'[\#\/].*\b(EMAIL_?(HOST|USER|USERNAME|PASSWORD|PORT)|SMTP_?(USER|PASSWORD|HOST))\s*[:=]\s*["\']?[^"\'\s]+["\']?',
-
-    # Private key or certificate file references
-    r'[\#\/].*\b(PRIVATE_?KEY|SSL_?(CERT|KEY|CA)|CERTIFICATE)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
+    # Optional: commented hardcoded secrets
+    r'[\#\/].*\b(DB_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|DATABASE_?(HOST|NAME|USER|USERNAME|PASSWORD|PORT|URI|URL)|HOST|PORT)\s*[:=]\s*["\']?[^"\'\s]+["\']?',
     ]
 
     
