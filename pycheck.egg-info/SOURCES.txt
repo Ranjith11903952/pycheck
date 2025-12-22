@@ -1,0 +1,11 @@
+README.md
+setup.py
+pycheck/__init__.py
+pycheck/cli.py
+pycheck/scanner.py
+pycheck/utils.py
+pycheck.egg-info/PKG-INFO
+pycheck.egg-info/SOURCES.txt
+pycheck.egg-info/dependency_links.txt
+pycheck.egg-info/entry_points.txt
+pycheck.egg-info/top_level.txt
