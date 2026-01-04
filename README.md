@@ -284,14 +284,3 @@ Stay secure, stay awesome! 🔐✨
 
 ```
 
----
-
-If you want, I can also:
-
-✅ Add a project logo  
-✅ Add a PyPI version badge (when you publish it)  
-✅ Add GIF or screenshot of usage  
-✅ Improve formatting or styling  
-
-Just tell me!
-```
