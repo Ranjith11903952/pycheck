@@ -181,42 +181,7 @@ pycheck --test
 | Social auth     | `SOCIAL_AUTH_GITHUB_SECRET = "..."` | ✅         |
 | Cloud secrets   | `AWS_SECRET_KEY = "..."`            | ✅         |
 
----
 
-## Integration 🔄
-
-### Pre-commit Hook
-
-Add to `.pre-commit-config.yaml`:
-
-```yaml
-repos:
-  - repo: https://github.com/Ranjith11903952/pycheck
-    rev: main
-    hooks:
-      - id: pycheck
-        args: [--no-prompt]
-```
-
-### GitHub Actions (CI/CD)
-
-```yaml
-name: Security Scan
-
-on: [push, pull_request]
-
-jobs:
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run PyCheck
-        run: |
-          pip install git+https://github.com/Ranjith11903952/pycheck.git
-          pycheck . --no-prompt
-```
-
----
 
 ## Configuration ⚙️
 
