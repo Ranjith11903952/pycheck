@@ -590,9 +590,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/Ranjith11903952/pycheck/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Ranjith11903952/pycheck/discussions)
 
----
 
 ## 🌟 Show Your Support
 
@@ -605,14 +603,7 @@ If PyCheck helped secure your project, please consider:
 
 ---
 
-## 📊 Project Stats
 
-![GitHub stars](https://img.shields.io/github/stars/Ranjith11903952/pycheck?style=social)
-![GitHub forks](https://img.shields.io/github/forks/Ranjith11903952/pycheck?style=social)
-![GitHub issues](https://img.shields.io/github/issues/Ranjith11903952/pycheck)
-![GitHub last commit](https://img.shields.io/github/last-commit/Ranjith11903952/pycheck)
-
----
 
 <div align="center">
 
